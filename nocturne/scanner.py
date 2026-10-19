@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -27,7 +28,8 @@ def scan_folder(path: Path, recursive: bool = True) -> list[Path]:
 
     files: list[Path] = []
     if recursive:
-        for root, dirs, names in path.walk():
+        # os.walk (not Path.walk) — keeps the 3.10/3.11 promise in pyproject
+        for root, dirs, names in os.walk(path):
             dirs[:] = sorted(
                 d for d in dirs if not d.startswith(".") and d not in _SKIP_DIRS
             )

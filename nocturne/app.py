@@ -213,6 +213,8 @@ class NocturneApp(App):
         self._painted_current: int = -2
         self._status_msg: str = ""
         self._blink_counter: int = 0
+        self._last_status_key: tuple | None = None
+        self._last_times: str = ""
         self.filter_text = ""
         self.zen = False
         self._shuffle_order: list[int] = []
@@ -251,7 +253,7 @@ class NocturneApp(App):
         return themes.theme_colors(self.theme)
 
     def on_mount(self) -> None:
-        self.set_interval(0.12, self._heartbeat)
+        self.set_interval(0.15, self._heartbeat)
         self.query_one("#wavebar", WaveBar).on_seek = self._seek_fraction
         self._refresh_topright()
 
@@ -324,6 +326,8 @@ class NocturneApp(App):
         self.query_one("#wavebar", WaveBar).set_theme(self.theme)
         self._refresh_topright()
         self._paint_current_row(force=True)
+        self._last_status_key = None
+        self._render_status(force=True)
         self.notify(f"theme: {self.theme}", timeout=2)
 
     def action_cycle_vis(self) -> None:
@@ -688,8 +692,8 @@ class NocturneApp(App):
         self._status_msg = msg
         self._render_status()
 
-    def _render_status(self) -> None:
-        blink_on = (self._blink_counter % 8) < 5
+    def _render_status(self, *, force: bool = False) -> None:
+        blink_on = ((self._blink_counter // 5) % 2) == 0
         cursor = "▊" if blink_on else " "
         prompt = Text()
         prompt.append(f"root@nocturne:{self._short_folder()}$ ",
@@ -720,10 +724,11 @@ class NocturneApp(App):
             self._auto_advance()
         pos, dur = self.engine.position, self.engine.duration
         try:
-            self.query_one("#np-time", Static).update(
-                f"{metadata.fmt_time(pos)} / {metadata.fmt_time(dur)}"
-            )
-            self.query_one("#wavebar", WaveBar).refresh()
+            times = f"{metadata.fmt_time(pos)} / {metadata.fmt_time(dur)}"
+            if times != self._last_times:
+                self._last_times = times
+                self.query_one("#np-time", Static).update(times)
+                self.query_one("#wavebar", WaveBar).refresh_bar()
             self._render_status()
         except Exception:
             pass

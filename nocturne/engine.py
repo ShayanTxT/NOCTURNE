@@ -216,12 +216,15 @@ class AudioEngine:
             self._ticker = None
 
     def _tick_loop(self) -> None:
+        """Silent-mode clock. Sleeps deeply when idle; paces in real time
+        while playing (sample rate re-read every loop)."""
         block = 512
-        dt = block / self._sr
         next_t = time.perf_counter()
         while not self._ticker_stop.is_set():
             with self.lock:
-                if self._playing and self._data is not None:
+                playing = self._playing and self._data is not None
+                if playing:
+                    sr = self._sr
                     n = min(block, len(self._data) - self._pos)
                     if n > 0:
                         self.vis.publish(
@@ -231,7 +234,12 @@ class AudioEngine:
                     if self._pos >= len(self._data):
                         self._playing = False
                         self._ended = True
-            next_t += dt
+            if not playing:
+                # idle: nothing to advance — poll slowly, nearly zero cost
+                self._ticker_stop.wait(0.1)
+                next_t = time.perf_counter()
+                continue
+            next_t += block / sr
             delay = next_t - time.perf_counter()
             if delay > 0:
                 self._ticker_stop.wait(delay)

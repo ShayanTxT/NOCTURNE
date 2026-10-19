@@ -44,7 +44,7 @@ def make_track(title: str, bpm: float, chords: list[list[str]], seed: int = 1) -
     events: list[tuple[float, np.ndarray]] = []
 
     time_cursor = 0.0
-    for bar, chord in enumerate(chords * 2):  # repeat progression
+    for _bar, chord in enumerate(chords * 2):  # repeat progression
         root = chord[0]
         # bass line — eighth note pulse
         for k in range(8):

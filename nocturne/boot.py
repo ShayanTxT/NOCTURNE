@@ -100,18 +100,18 @@ class BootScreen(ModalScreen):
         self._full = self._build_log()
         self.query_one("#boot-log", Static).update(Text(""))
         self.focus()
-        self.set_interval(0.012, self._type_tick)
+        self.set_interval(0.02, self._type_tick)
 
     def _type_tick(self) -> None:
         self._ticks = getattr(self, "_ticks", 0) + 1
-        if self._ticks > 1500:  # failsafe: never trap the app in a bad env
+        if self._ticks > 900:  # failsafe (~18s): never trap the app in a bad env
             self._finish()
             return
         if self._full is None:
             return
         total = len(self._full.plain)
         if self._revealed < total:
-            self._revealed = min(total, self._revealed + 9)
+            self._revealed = min(total, self._revealed + 12)
             self.query_one("#boot-log", Static).update(self._full[: self._revealed])
         else:
             self._hold += 1
