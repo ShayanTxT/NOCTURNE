@@ -215,6 +215,7 @@ class NocturneApp(App):
         self._blink_counter: int = 0
         self._last_status_key: tuple | None = None
         self._last_times: str = ""
+        self._last_scan_skipped: list[str] = []
         self.filter_text = ""
         self.zen = False
         self._shuffle_order: list[int] = []
@@ -356,32 +357,53 @@ class NocturneApp(App):
 
         files = scanner.scan_folder(folder, recursive=recursive)
         tracks: list[metadata.Track] = []
+        skipped: list[str] = []
         for p in files:
-            try:
+            size = p.stat().st_size
+            dur = sr = 0
+            fmt = sub = ""
+            ok = False
+            try:  # fast path: libsndfile (flac/wav/ogg/mp3 on modern builds)
                 info = sf.info(str(p))
+                dur = info.frames / max(info.samplerate, 1)
+                sr, fmt, sub = info.samplerate, info.format, info.subtype
+                ok = True
             except Exception:
+                pass
+            if not ok:  # fallback: mutagen probe (mp3/m4a/wma/…)
+                probe = metadata.probe(str(p))
+                if probe is not None:
+                    dur, sr, fmt = probe
+                    ok = True
+            if not ok:
+                skipped.append(p.name)
                 continue
-            t = metadata.Track(
-                path=p,
-                duration=info.frames / max(info.samplerate, 1),
-                samplerate=info.samplerate,
-                format=info.format,
-                subtype=info.subtype,
-                size_bytes=p.stat().st_size,
-            )
+            t = metadata.Track(path=p, duration=dur, samplerate=sr,
+                               format=fmt, subtype=sub, size_bytes=size)
             t.tags = metadata.read_tags(p)
             tracks.append(t)
-        self.call_from_thread(self._scan_done, folder, tracks)
+        self.call_from_thread(self._scan_done, folder, tracks, skipped)
 
-    def _scan_done(self, folder: Path, tracks: list[metadata.Track]) -> None:
+    def _scan_done(self, folder: Path, tracks: list[metadata.Track],
+                   skipped: list[str] | None = None) -> None:
         self.tracks = tracks
         self.current = -1
         self._painted_current = -2
+        self._last_scan_skipped = skipped or []
         total = sum(t.duration for t in tracks)
         self._apply_filter()
-        self._set_status(
-            f"{len(tracks)} files indexed · {metadata.fmt_time(total)} total"
-        )
+        msg = f"{len(tracks)} files indexed · {metadata.fmt_time(total)} total"
+        if self._last_scan_skipped:
+            msg += f" · {len(self._last_scan_skipped)} skipped"
+        self._set_status(msg)
+        if self._last_scan_skipped:
+            sample = ", ".join(self._last_scan_skipped[:2])
+            more = f" +{len(self._last_scan_skipped) - 2} more" if len(self._last_scan_skipped) > 2 else ""
+            self.notify(
+                f"{len(self._last_scan_skipped)} files skipped "
+                f"(unsupported/damaged): {sample}{more}",
+                title="nocturne", severity="warning", timeout=8,
+            )
         if tracks:
             self.notify(f"{len(tracks)} tracks indexed", title="nocturne", timeout=3)
             self._play_index(0)
@@ -487,7 +509,7 @@ class NocturneApp(App):
         self.current = ti
         self.engine.play()
         t = self.tracks[ti]
-        tech_bits = [t.subtitle, f"{info['format']}.{info['subtype']}",
+        tech_bits = [t.subtitle, f"{info.get('decoder', 'libsndfile')}",
                      f"{info['samplerate'] / 1000:g} kHz"]
         if t.tags.bitrate_kbps:
             tech_bits.append(f"{t.tags.bitrate_kbps}kbps")

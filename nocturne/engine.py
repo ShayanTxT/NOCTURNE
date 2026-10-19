@@ -6,10 +6,17 @@ real-time PCM taps for the spectrum visualizer.  When no audio device is
 available (headless boxes, CI, missing PortAudio) the engine transparently
 falls back to a *silent clock* that behaves exactly like real playback, so
 the whole UI still works.
+
+Decoder chain (first one that works wins):
+  1. libsndfile  — FLAC/WAV/OGG/AIFF (+MP3 on libsndfile >= 1.1)
+  2. miniaudio   — MP3/MP2/Vorbis/WAV/FLAC (bundled C lib, pip wheel)
+  3. ffmpeg      — anything ffmpeg plays (M4A/AAC/WMA/…), if on PATH
 """
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 import threading
 import time
 
@@ -27,6 +34,11 @@ except Exception as _e:  # pragma: no cover
         "Nocturne requires 'soundfile' (libsndfile). pip install soundfile"
     ) from _e
 
+try:  # optional: MP3/m4a-era fallback decoder
+    import miniaudio as _miniaudio
+except Exception:  # pragma: no cover
+    _miniaudio = None
+
 
 class TrackLoadError(Exception):
     """Raised when a file cannot be decoded for playback."""
@@ -34,6 +46,7 @@ class TrackLoadError(Exception):
 
 FILE_TOO_LARGE_MSG = "file too large for memory playback"
 MAX_RAM_BYTES = 400 * 1024 * 1024  # ~50 minutes of stereo float32 @48kHz
+FFMPEG_SR = 44100                  # forced rate for the ffmpeg fallback path
 
 
 class VisBus:
@@ -78,6 +91,7 @@ class AudioEngine:
         self.device_name: str | None = None
         self.mode: str = "device"
         self.last_error: str | None = None
+        self.last_decoder: str | None = None
 
         self._ticker: threading.Thread | None = None
         self._ticker_stop = threading.Event()
@@ -108,21 +122,7 @@ class AudioEngine:
     # ------------------------------------------------------------------- load
     def load(self, path) -> dict:
         """Decode *path* into memory and prepare playback. Returns file info."""
-        try:
-            info = _sf.info(str(path))
-            if info.frames * info.channels * 4 > MAX_RAM_BYTES:
-                raise TrackLoadError(FILE_TOO_LARGE_MSG)
-            data, sr = _sf.read(str(path), dtype="float32", always_2d=True)
-        except TrackLoadError:
-            raise
-        except Exception as exc:
-            raise TrackLoadError(f"cannot decode: {exc}") from exc
-
-        # normalize channel layout to stereo
-        if data.shape[1] >= 2:
-            data = np.ascontiguousarray(data[:, :2])
-        else:
-            data = np.ascontiguousarray(np.repeat(data, 2, axis=1))
+        data, sr, decoder = _decode_any(path)
 
         with self.lock:
             self._data = data
@@ -131,6 +131,7 @@ class AudioEngine:
             self._playing = False
             self._ended = False
             self._envelope = _compute_envelope(data, buckets=900)
+            self.last_decoder = decoder
 
         self._reopen_stream()
         return {
@@ -138,8 +139,7 @@ class AudioEngine:
             "channels": 2,
             "frames": len(data),
             "duration": len(data) / sr,
-            "format": info.format,
-            "subtype": info.subtype,
+            "decoder": decoder,
         }
 
     def unload(self) -> None:
@@ -346,6 +346,90 @@ class AudioEngine:
                     pass
                 self.stream = None
             self._data = None
+
+
+# ------------------------------------------------------------------ decoders
+def _decode_any(path) -> tuple[np.ndarray, int, str]:
+    """Try every decoder; return (stereo f32 data, samplerate, decoder name)."""
+    errors: list[str] = []
+    for name, fn in (
+        ("libsndfile", _load_sndfile),
+        ("miniaudio", _load_miniaudio),
+        ("ffmpeg", _load_ffmpeg),
+    ):
+        if fn is None:
+            continue
+        try:
+            data, sr = fn(path)
+            if len(data) > 0:
+                return data, sr, name
+            errors.append(f"{name}: empty")
+        except TrackLoadError as exc:
+            errors.append(f"{name}: {exc}")
+        except Exception as exc:
+            errors.append(f"{name}: {exc}")
+    raise TrackLoadError(_short_reason(errors))
+
+
+def _short_reason(errors: list[str]) -> str:
+    """Human-friendly one-liner from the per-decoder errors."""
+    joined = " | ".join(errors)
+    low = joined.lower()
+    if "mp3" in low and "miniaudio" in low and _miniaudio is None:
+        return "install the mp3 decoder: pip install miniaudio"
+    if "ffmpeg" in low and shutil.which("ffmpeg") is None and (
+        ".m4a" in low or "aac" in low or "wma" in low or "mp4" in low
+    ):
+        return "m4a/aac/wma need ffmpeg on PATH"
+    return joined[:160]
+
+
+def _load_sndfile(path) -> tuple[np.ndarray, int]:
+    info = _sf.info(str(path))
+    if info.frames * info.channels * 4 > MAX_RAM_BYTES:
+        raise TrackLoadError(FILE_TOO_LARGE_MSG)
+    data, sr = _sf.read(str(path), dtype="float32", always_2d=True)
+    return _to_stereo(data), sr
+
+
+def _load_miniaudio(path) -> tuple[np.ndarray, int]:
+    if _miniaudio is None:
+        raise TrackLoadError("miniaudio not installed")
+    decoded = _miniaudio.decode_file(
+        str(path),
+        output_format=_miniaudio.SampleFormat.FLOAT32,
+        nchannels=2,
+        sample_rate=44100,
+    )
+    data = np.asarray(decoded.samples, dtype=np.float32).reshape(-1, 2)
+    if data.nbytes > MAX_RAM_BYTES:
+        raise TrackLoadError(FILE_TOO_LARGE_MSG)
+    return np.ascontiguousarray(data), int(decoded.sample_rate)
+
+
+def _load_ffmpeg(path) -> tuple[np.ndarray, int]:
+    exe = shutil.which("ffmpeg")
+    if exe is None:
+        raise TrackLoadError("ffmpeg not found on PATH")
+    cmd = [
+        exe, "-v", "error", "-i", str(path),
+        "-f", "f32le", "-acodec", "pcm_f32le", "-ac", "2", "-ar", str(FFMPEG_SR), "-",
+    ]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if proc.returncode != 0 or not proc.stdout:
+        msg = proc.stderr.decode("utf-8", "replace").strip().splitlines()
+        raise TrackLoadError(msg[-1][:120] if msg else f"exit {proc.returncode}")
+    raw = np.frombuffer(proc.stdout, dtype=np.float32)
+    if raw.nbytes > MAX_RAM_BYTES:
+        raise TrackLoadError(FILE_TOO_LARGE_MSG)
+    data = raw.reshape(-1, 2)
+    return np.ascontiguousarray(data), FFMPEG_SR
+
+
+def _to_stereo(data: np.ndarray) -> np.ndarray:
+    if data.shape[1] >= 2:
+        return np.ascontiguousarray(data[:, :2])
+    return np.ascontiguousarray(np.repeat(data, 2, axis=1))
 
 
 def _zeros(n: int) -> np.ndarray:

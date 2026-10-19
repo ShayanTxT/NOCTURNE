@@ -186,3 +186,14 @@ async def test_open_screen_flow(demo) -> None:
         await pilot.pause(2.0)
         assert len(app.tracks) == 2
         assert app.folder == demo
+
+
+async def test_scan_reports_skipped_files(demo) -> None:
+    """Broken files must be counted + reported, never silently dropped."""
+    async with NocturneApp(start_path=str(demo), silent=True,
+                           boot_sequence=False).run_test() as pilot:
+        await pilot.pause(1.5)
+        app = pilot.app
+        assert len(app.tracks) == 2           # only decodable ones in playlist
+        assert len(app._last_scan_skipped) == 1
+        assert app._last_scan_skipped[0] == "03_broken.wav"

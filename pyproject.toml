@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nocturne"
-version = "2.0.1"
+version = "2.1.0"
 description = "The hacker's terminal music player — Mr. Robot vibes, live spectrum & waveform seeking. 100% offline."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -28,6 +28,7 @@ dependencies = [
     "textual>=1.0",
     "soundfile>=0.12.1",
     "sounddevice>=0.4.6",
+    "miniaudio>=1.61",
     "numpy>=1.24",
     "mutagen>=1.46",
 ]

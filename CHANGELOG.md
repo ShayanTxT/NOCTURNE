@@ -2,6 +2,23 @@
 
 All notable changes to Nocturne are documented here.
 
+## [2.1.0] — 2026-10-19 — play (almost) everything
+
+### Fixed
+- Large real-world folders were silently under-counted: files libsndfile could
+  not probe (old libsndfile without MP3, or M4A/AAC/WMA) vanished without a
+  word. The scan now falls back to a mutagen probe, keeps them in the playlist,
+  and reports skipped files with a count and sample names.
+
+### Added
+- Decoder chain: libsndfile -> miniaudio -> ffmpeg (first that works wins)
+  - MP3/MP2 guaranteed everywhere via bundled miniaudio (new dependency)
+  - M4A/AAC/WMA play when ffmpeg is on PATH; playlist still lists them without it
+  - `pip install miniaudio` hint when an old libsndfile rejects MP3
+- New in scanner: `.mp2 .m4a .aac .wma .aifc`
+- Now-playing bar shows which decoder is active
+
+## [2.0.1]
 ## [2.0.1] — 2026-10-19 — performance & hardening
 
 ### Fixed

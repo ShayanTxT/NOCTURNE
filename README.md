@@ -32,7 +32,8 @@ I am a terminal music player. Feed me a folder. I play everything inside it.
   - **oscilloscope** — raw waveform trace
 - 〰️ **Waveform seek bar** — rendered from the actual track envelope; click or drag to seek
 - 📂 **Folder = playlist** — recursive scan, natural sort (`track2` < `track10`), ID3/Vorbis tags
-- 🎵 **Plays everything libsndfile does** — `FLAC`, `WAV`, `OGG/Opus`, `AIFF`, …
+- 🎵 **Plays (almost) everything** — `FLAC`, `WAV`, `OGG/Opus`, `AIFF`, `MP3` (always, via bundled miniaudio), and `M4A/AAC/WMA` when ffmpeg is on PATH
+- 🩺 **Honest scanning** — files it can't decode are counted and reported, never silently dropped
 - 🔀 **Shuffle & repeat** (off / all / one) with auto-advance and auto-skip of dead files
 - 🎨 **5 CRT-grade themes** — `fsociety`, `redroom`, `crt`, `cipher`, `ghost`
 - 🧘 **Zen mode** (`f`) — giant visualizer, nothing else

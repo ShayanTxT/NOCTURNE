@@ -7,7 +7,9 @@ import re
 from pathlib import Path
 
 AUDIO_EXTENSIONS = {
-    ".mp3", ".wav", ".flac", ".ogg", ".oga", ".opus", ".aif", ".aiff", ".w64",
+    ".mp3", ".mp2", ".wav", ".flac", ".ogg", ".oga", ".opus",
+    ".m4a", ".aac", ".wma",          # playback needs miniaudio/ffmpeg (see engine)
+    ".aif", ".aiff", ".aifc", ".w64",
 }
 
 _SKIP_DIRS = {"lost+found", "$RECYCLE.BIN", "System Volume Information", "."}

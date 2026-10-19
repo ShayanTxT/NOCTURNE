@@ -72,6 +72,27 @@ def read_tags(path: Path) -> Tags:
     return tags
 
 
+def probe(path) -> tuple[float, int, str] | None:
+    """Fallback probe via mutagen: returns (duration, samplerate, format)."""
+    if mutagen is None:
+        return None
+    try:
+        mf = mutagen.File(path)
+    except Exception:
+        return None
+    if mf is None or not hasattr(mf, "info"):
+        return None
+    try:
+        length = float(getattr(mf.info, "length", 0.0) or 0.0)
+        sr = int(getattr(mf.info, "sample_rate", 0) or 0)
+        kind = type(mf).__name__  # MP3, M4A, WMA, ...
+        if length <= 0:
+            return None
+        return length, sr, kind
+    except Exception:
+        return None
+
+
 def fmt_time(seconds: float) -> str:
     seconds = max(0, int(seconds))
     h, rem = divmod(seconds, 3600)
