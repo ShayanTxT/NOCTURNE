@@ -6,7 +6,7 @@
 
 I am a terminal music player. Feed me a folder. I play everything inside it.
 **100% offline. No accounts. No telemetry. No packets leave this machine.**
-
+[فارسی](README.fa.md) | [English](README.md) 
 [![CI](https://img.shields.io/badge/CI-GitHub_Actions-blue)](.github/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
