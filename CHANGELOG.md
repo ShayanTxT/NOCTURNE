@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to TermVibe are documented here.
+All notable changes to Nocturne are documented here.
 
 ## [1.0.0] — 2026-10-19
 

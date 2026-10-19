@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from termvibe.app import TermVibeApp
+from nocturne.app import NocturneApp
 
 
 @pytest.fixture()
@@ -24,7 +24,7 @@ def demo(tmp_path):
 
 
 async def test_app_scans_and_autoplays(demo) -> None:
-    async with TermVibeApp(start_path=str(demo), silent=True).run_test() as pilot:
+    async with NocturneApp(start_path=str(demo), silent=True, boot_sequence=False).run_test() as pilot:
         await pilot.pause(1.5)
         app = pilot.app
         assert len(app.tracks) == 2          # broken + txt skipped
@@ -33,7 +33,7 @@ async def test_app_scans_and_autoplays(demo) -> None:
 
 
 async def test_next_prev(demo) -> None:
-    async with TermVibeApp(start_path=str(demo), silent=True).run_test() as pilot:
+    async with NocturneApp(start_path=str(demo), silent=True, boot_sequence=False).run_test() as pilot:
         await pilot.pause(1.5)
         app = pilot.app
         await pilot.press("n")
@@ -45,7 +45,7 @@ async def test_next_prev(demo) -> None:
 
 
 async def test_auto_advance_at_end(demo) -> None:
-    async with TermVibeApp(start_path=str(demo), silent=True).run_test() as pilot:
+    async with NocturneApp(start_path=str(demo), silent=True, boot_sequence=False).run_test() as pilot:
         await pilot.pause(1.5)
         app = pilot.app
         app.engine.seek(app.engine.duration - 0.3)   # near the end
@@ -55,7 +55,7 @@ async def test_auto_advance_at_end(demo) -> None:
 
 
 async def test_repeat_one_stays(demo) -> None:
-    async with TermVibeApp(start_path=str(demo), silent=True, repeat="one").run_test() as pilot:
+    async with NocturneApp(start_path=str(demo), silent=True, repeat="one", boot_sequence=False).run_test() as pilot:
         await pilot.pause(1.5)
         app = pilot.app
         app.engine.seek(app.engine.duration - 0.3)
@@ -65,7 +65,7 @@ async def test_repeat_one_stays(demo) -> None:
 
 
 async def test_repeat_off_stops(demo) -> None:
-    async with TermVibeApp(start_path=str(demo), silent=True, repeat="off").run_test() as pilot:
+    async with NocturneApp(start_path=str(demo), silent=True, repeat="off", boot_sequence=False).run_test() as pilot:
         await pilot.pause(1.5)
         app = pilot.app
         await pilot.press("n")            # jump to the last track
@@ -76,7 +76,7 @@ async def test_repeat_off_stops(demo) -> None:
 
 
 async def test_toggle_pause(demo) -> None:
-    async with TermVibeApp(start_path=str(demo), silent=True).run_test() as pilot:
+    async with NocturneApp(start_path=str(demo), silent=True, boot_sequence=False).run_test() as pilot:
         await pilot.pause(1.5)
         app = pilot.app
         await pilot.press("space")
@@ -86,7 +86,7 @@ async def test_toggle_pause(demo) -> None:
 
 
 async def test_volume_and_mute_keys(demo) -> None:
-    async with TermVibeApp(start_path=str(demo), silent=True).run_test() as pilot:
+    async with NocturneApp(start_path=str(demo), silent=True, boot_sequence=False).run_test() as pilot:
         await pilot.pause(1.5)
         app = pilot.app
         start = app.engine.volume
@@ -100,7 +100,7 @@ async def test_volume_and_mute_keys(demo) -> None:
 
 
 async def test_seek_keys(demo) -> None:
-    async with TermVibeApp(start_path=str(demo), silent=True).run_test() as pilot:
+    async with NocturneApp(start_path=str(demo), silent=True, boot_sequence=False).run_test() as pilot:
         await pilot.pause(1.5)
         app = pilot.app
         await pilot.press("space")        # pause -> position stays put
@@ -115,7 +115,7 @@ async def test_seek_keys(demo) -> None:
 
 
 async def test_filter_playlist(demo) -> None:
-    async with TermVibeApp(start_path=str(demo), silent=True).run_test() as pilot:
+    async with NocturneApp(start_path=str(demo), silent=True, boot_sequence=False).run_test() as pilot:
         await pilot.pause(1.5)
         app = pilot.app
         app.filter_text = "two"
@@ -129,11 +129,11 @@ async def test_filter_playlist(demo) -> None:
 
 
 async def test_theme_cycle_and_zen(demo) -> None:
-    async with TermVibeApp(start_path=str(demo), silent=True, theme="ice").run_test() as pilot:
+    async with NocturneApp(start_path=str(demo), silent=True, theme="cipher", boot_sequence=False).run_test() as pilot:
         await pilot.pause(1.5)
         app = pilot.app
         await pilot.press("t")
-        assert app.theme == "candy"   # ice -> candy in theme order
+        assert app.theme == "ghost"   # cipher -> ghost in theme order
         await pilot.press("f")
         assert app.has_class("zen")
         await pilot.press("f")
@@ -141,7 +141,7 @@ async def test_theme_cycle_and_zen(demo) -> None:
 
 
 async def test_shuffle_and_repeat_cycle(demo) -> None:
-    async with TermVibeApp(start_path=str(demo), silent=True).run_test() as pilot:
+    async with NocturneApp(start_path=str(demo), silent=True, boot_sequence=False).run_test() as pilot:
         await pilot.pause(1.5)
         app = pilot.app
         assert app.cfg["repeat"] == "all"
@@ -154,7 +154,7 @@ async def test_shuffle_and_repeat_cycle(demo) -> None:
 
 
 async def test_help_screen(demo) -> None:
-    async with TermVibeApp(start_path=str(demo), silent=True).run_test() as pilot:
+    async with NocturneApp(start_path=str(demo), silent=True, boot_sequence=False).run_test() as pilot:
         await pilot.pause(1.5)
         app = pilot.app
         await pilot.press("question_mark")
@@ -168,7 +168,7 @@ async def test_help_screen(demo) -> None:
 
 
 async def test_splash_shown_without_path() -> None:
-    async with TermVibeApp(silent=True).run_test() as pilot:
+    async with NocturneApp(silent=True, boot_sequence=False).run_test() as pilot:
         await pilot.pause(0.8)
         app = pilot.app
         assert app.tracks == []
@@ -176,7 +176,7 @@ async def test_splash_shown_without_path() -> None:
 
 
 async def test_open_screen_flow(demo) -> None:
-    async with TermVibeApp(silent=True).run_test() as pilot:
+    async with NocturneApp(silent=True, boot_sequence=False).run_test() as pilot:
         await pilot.pause(0.8)
         app = pilot.app
         await pilot.press("o")

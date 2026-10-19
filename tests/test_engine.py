@@ -1,4 +1,4 @@
-"""Tests for the TermVibe audio engine (silent mode — no device needed)."""
+"""Tests for the Nocturne audio engine (silent mode — no device needed)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from termvibe.engine import AudioEngine, TrackLoadError, _compute_envelope
+from nocturne.engine import AudioEngine, TrackLoadError, _compute_envelope
 
 
 @pytest.fixture()

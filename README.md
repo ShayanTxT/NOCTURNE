@@ -1,61 +1,69 @@
 <div align="center">
 
-# ♪ TermVibe
+# ▓▒░ NOCTURNE
 
-**A stunning terminal music player — live spectrum, waveform seeking, neon themes. 100% offline.**
+**The hacker's terminal music player — Mr. Robot vibes, live spectrum, zero network.**
+
+I am a terminal music player. Feed me a folder. I play everything inside it.
+**100% offline. No accounts. No telemetry. No packets leave this machine.**
 
 [![CI](https://img.shields.io/badge/CI-GitHub_Actions-blue)](.github/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![No network](https://img.shields.io/badge/network-none-success)](README.md#why-offline)
+[![network](https://img.shields.io/badge/network-none-success)](#why-offline)
 
-![TermVibe screenshot](docs/screenshot.svg)
+**Boot sequence** — every launch feels like intrusion day:
+
+![Nocturne boot sequence](docs/boot.svg)
+
+**The player** — fsociety theme, live FFT spectrum, waveform seek bar,
+`root@nocturne` prompt:
+
+![Nocturne screenshot](docs/screenshot.svg)
 
 </div>
 
-Point TermVibe at any folder and it finds every audio file inside (recursively),
-builds a playlist and plays it — with a real-time FFT spectrum analyzer, a
-clickable waveform seek bar, shuffle/repeat, a live playlist filter and five
-neon color themes. **No accounts, no streaming, no telemetry — your music never
-leaves your machine.**
-
 ## ✨ Features
 
-- 🎵 **Plays everything libsndfile does** — `FLAC`, `WAV`, `OGG/Opus`, `AIFF`, …
-- 📊 **Live spectrum visualizer** — real FFT (log-spaced bands), fast-attack/slow-release smoothing, falling peak caps, auto-gain
+- 👾 **Hacker boot sequence** — typed-out system log with `ACCESS GRANTED` (skip with any key, disable with `--no-boot`)
+- 📊 **3 live visualizers** (`v` to cycle):
+  - **spectrum** — real-time FFT, log-spaced bands, falling peak caps, auto-gain
+  - **matrix rain** — digital rain that dances to the music
+  - **oscilloscope** — raw waveform trace
 - 〰️ **Waveform seek bar** — rendered from the actual track envelope; click or drag to seek
-- 📂 **Folder = playlist** — recursive scan with natural sorting (`track2` before `track10`), reads ID3/Vorbis tags (title/artist/album/bitrate/year)
-- 🔀 **Shuffle & repeat** (off / all / one) with gap-free-ish auto advance
-- 🎨 **5 neon themes** — `synthwave`, `matrix`, `sunset`, `ice`, `candy` — press `t` to cycle
-- 🧘 **Zen mode** — giant visualizer, everything else hidden
-- 🔍 **Instant filter** — press `/` and type to filter by title/artist/filename
-- 💾 **M3U export** (`ctrl+s`), remembers your last folder, volume & theme
-- 🔇 **Silent mode** (`--silent`) — full UI without an audio device (demos, CI,SSH boxes)
+- 📂 **Folder = playlist** — recursive scan, natural sort (`track2` < `track10`), ID3/Vorbis tags
+- 🎵 **Plays everything libsndfile does** — `FLAC`, `WAV`, `OGG/Opus`, `AIFF`, …
+- 🔀 **Shuffle & repeat** (off / all / one) with auto-advance and auto-skip of dead files
+- 🎨 **5 CRT-grade themes** — `fsociety`, `redroom`, `crt`, `cipher`, `ghost`
+- 🧘 **Zen mode** (`f`) — giant visualizer, nothing else
+- 🔍 **Instant filter** (`/`) — by title / artist / filename
+- 💾 **M3U export** (`ctrl+s`), persistent config (folder / volume / theme / modes)
+- 👻 **Ghost mode** (`--silent`) — full UI with no audio device (SSH boxes, CI, demos)
 
 ## 🚀 Quick start
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/termvibe.git
-cd termvibe
+git clone https://github.com/YOUR_USERNAME/nocturne.git
+cd nocturne
 pip install .
 
-# try it instantly with generated demo tracks (no downloads needed):
+# zero downloads needed — synthesize demo tracks and play them:
 python scripts/make_demo_tracks.py
-termvibe demo_tracks
+nocturne demo_tracks
 ```
 
-Or just point it at your library:
+Point it at your library:
 
 ```bash
-termvibe ~/Music                 # recursive scan, autoplay
-termvibe ~/Music --flat          # ignore subfolders
-termvibe ~/Music -s -r one       # shuffle + repeat-one
-termvibe song.flac               # a single file
-termvibe --theme matrix          # pick a theme
-termvibe --list-themes
+nocturne ~/Music                 # recursive scan, autoplay
+nocturne ~/Music --flat          # ignore subfolders
+nocturne ~/Music -s -r one       # shuffle + repeat-one
+nocturne song.flac               # a single file
+nocturne --theme redroom         # pick a theme
+nocturne --no-boot --list-themes # skip intro, list themes
 ```
 
-With no arguments, TermVibe reopens your last folder.
+With no arguments, Nocturne reopens your last target folder.
 
 ### Linux note
 
@@ -68,7 +76,7 @@ sudo pacman -S portaudio              # Arch
 ```
 
 On **Windows** and **macOS** the wheels bundle everything — just `pip install .`
-(use [Windows Terminal](https://aka.ms/terminal) for the best look on Windows).
+(use [Windows Terminal](https://aka.ms/terminal) on Windows for the full CRT look).
 
 ## ⌨️ Key bindings
 
@@ -80,44 +88,48 @@ On **Windows** and **macOS** the wheels bundle everything — just `pip install 
 | `,` `.` | seek −30s / +30s |
 | `+` / `−` | volume up / down |
 | `m` | mute |
+| `v` | visualizer: spectrum → matrix rain → oscilloscope |
 | `s` | shuffle |
-| `r` | repeat mode: off → all → one |
-| `t` | next color theme |
-| `f` | zen mode (giant visualizer) |
+| `r` | repeat: off → all → one |
+| `t` | next theme |
+| `f` | zen mode |
 | `/` | filter playlist (`esc` clears) |
-| `enter` / click | play highlighted track |
+| `enter` / click | play track |
 | click / drag waveform | seek |
 | `o` | open folder or file |
-| `F5` | rescan folder |
+| `F5` | rescan |
 | `ctrl+s` | save playlist as `.m3u` |
-| `?` | help overlay |
-| `q` | quit |
+| `?` | help (`nocturne(1)` man-style) |
+| any key | skip boot sequence |
+| `q` | quit — "control is an illusion" |
 
 ## 🎨 Themes
 
-`synthwave` · `matrix` · `sunset` · `ice` · `candy` — cycle with `t`, or start
-with `--theme matrix`. Your choice is saved to the config file.
+`fsociety` (phosphor green) · `redroom` (alarm red) · `crt` (amber terminal) ·
+`cipher` (ice cyan) · `ghost` (violet) — cycle with `t`, start with
+`--theme matrix`… sorry, `--theme redroom`. Your pick is saved.
 
 ## ⚙️ Configuration
 
-TermVibe stores a tiny JSON file (folder, volume, theme, shuffle, repeat):
+One tiny JSON file (folder, volume, theme, shuffle, repeat, visualizer mode):
 
-- Linux/macOS: `~/.config/termvibe/config.json`
-- Windows: `%APPDATA%\termvibe\config.json`
+- Linux/macOS: `~/.config/nocturne/config.json`
+- Windows: `%APPDATA%\nocturne\config.json`
 
 ## 🗂 Project layout
 
 ```
-termvibe/
-├── termvibe/
-│   ├── app.py        # Textual UI (screens, bindings, playlist logic)
+nocturne/
+├── nocturne/
+│   ├── app.py        # Textual UI: screens, bindings, playlist logic
+│   ├── boot.py       # typed-out boot sequence overlay
 │   ├── cli.py        # argparse front-end
-│   ├── engine.py     # sounddevice stream + silent-clock fallback
-│   ├── scanner.py    # recursive folder scan, natural sort
-│   ├── metadata.py   # mutagen tags, Track model, time formatting
+│   ├── engine.py     # sounddevice stream + silent "ghost" fallback
+│   ├── scanner.py    # recursive scan, natural sort
+│   ├── metadata.py   # mutagen tags, Track model
 │   ├── spectrum.py   # FFT analyzer (log bands, peaks, auto-gain)
-│   ├── widgets.py    # spectrum + waveform widgets (custom render_line)
-│   ├── themes.py     # 5 neon themes + gradient helpers
+│   ├── widgets.py    # spectrum / rain / scope + waveform widgets
+│   ├── themes.py     # 5 themes + gradient helpers
 │   └── config.py     # JSON persistence
 ├── scripts/
 │   ├── make_demo_tracks.py   # synthesizes demo music with numpy
@@ -135,9 +147,11 @@ pytest
 
 ## Why offline?
 
-TermVibe is a **local** player: it scans folders you give it, decodes audio with
-libsndfile in-process and plays through your sound device. There is no network
-code at all — no updates to phone home for, nothing to leak.
+Nocturne scans the folders you give it, decodes audio in-process with libsndfile
+and plays it through your sound device. There is **no network code at all** —
+nothing phones home, nothing to subpoena. Your machine stays yours.
+
+> Your traffic is monitored. Keep it that way — locally.
 
 ## License
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate small synthesized demo tracks (FLAC/WAV/OGG) so you can try
-TermVibe instantly, with no downloads. Pure numpy — no network needed.
+Nocturne instantly, with no downloads. Pure numpy — no network needed.
 
     python scripts/make_demo_tracks.py [output_dir]
 """

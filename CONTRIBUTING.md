@@ -1,12 +1,12 @@
-# Contributing to TermVibe
+# Contributing to Nocturne
 
-Thanks for wanting to make TermVibe cooler! 🎹
+Thanks for wanting to make Nocturne cooler! 🎹
 
 ## Getting set up
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/termvibe.git
-cd termvibe
+git clone https://github.com/YOUR_USERNAME/nocturne.git
+cd nocturne
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 pytest
@@ -25,7 +25,7 @@ On Linux you'll want PortAudio for actual sound: `sudo apt install libportaudio2
 
 ## Ideas that would be extra awesome
 
-- More themes (add an entry to `termvibe/themes.py` — that's all it takes)
+- More themes (add an entry to `nocturne/themes.py` — that's all it takes)
 - OSC / oscilloscope visualizer modes
 - CUE sheet support, gapless playback
 - A `--screenshot` CLI flag that renders the UI headlessly

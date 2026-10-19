@@ -6,8 +6,8 @@ import json
 
 import numpy as np
 
-from termvibe import config, themes
-from termvibe.spectrum import SpectrumAnalyzer
+from nocturne import config, themes
+from nocturne.spectrum import SpectrumAnalyzer
 
 
 def _tone_block(sr: int = 44100, freq: float = 1000.0, n: int = 2048) -> np.ndarray:
@@ -94,7 +94,7 @@ def test_config_roundtrip(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(config, "config_dir", lambda: cfg_dir)
     monkeypatch.setattr(config, "config_path", lambda: cfg_dir / "config.json")
     cfg = config.load_config()
-    assert cfg["theme"] == "synthwave"
+    assert cfg["theme"] == "fsociety"
     cfg["volume"] = 0.42
     cfg["repeat"] = "bogus"     # invalid value gets sanitized on load
     config.save_config(cfg)

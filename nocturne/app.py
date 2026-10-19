@@ -1,8 +1,8 @@
 """
-TermVibe — a stunning terminal music player.
+NOCTURNE — offline audio intrusion unit.
 
-Playlist, live spectrum visualizer, waveform seek bar, shuffle/repeat,
-themes, M3U export and more — 100% offline.
+A hacker-terminal music player: playlist, live spectrum / matrix-rain /
+oscilloscope visualizers, waveform seek bar, boot sequence, themes.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ import random
 import threading
 from pathlib import Path
 
+from rich.style import Style
 from rich.text import Text
 from textual import on
 from textual.app import App, ComposeResult
@@ -19,8 +20,9 @@ from textual.screen import ModalScreen
 from textual.widgets import Footer, Input, ListItem, ListView, Static
 
 from . import __version__, config, metadata, scanner, themes
+from .boot import BootScreen
 from .engine import AudioEngine, TrackLoadError
-from .widgets import LOGO, SpectrumWidget, WaveBar, gradient_text
+from .widgets import LOGO_TEXT, SKULL, SpectrumWidget, WaveBar, gradient_text
 
 IND_PLAY = "▶"
 IND_PAUSE = "▌▌"
@@ -33,17 +35,26 @@ HELP_ROWS = [
     (",  .", "seek −30s / +30s"),
     ("+  −", "volume up / down"),
     ("m", "mute"),
+    ("v", "visualizer: spectrum → rain → scope"),
     ("s", "shuffle"),
     ("r", "repeat mode (off / all / one)"),
     ("t", "next color theme"),
     ("f", "zen mode — giant visualizer"),
     ("/", "filter playlist"),
     ("enter / click", "play track"),
-    ("o", "open folder"),
+    ("click waveform", "seek"),
+    ("o", "open folder or file"),
     ("F5", "rescan folder"),
     ("ctrl+s", "save playlist as M3U"),
     ("?", "this help"),
     ("q", "quit"),
+]
+
+_IDLE_WHISPERS = [
+    "hello, friend.",
+    "control is an illusion.",
+    "no packets leave this machine.",
+    "the rest is noise.",
 ]
 
 
@@ -53,18 +64,18 @@ class HelpScreen(ModalScreen):
         ("q", "close", "Close"),
     ]
     DEFAULT_CSS = """
-    HelpScreen { align: center middle; background: #00000088; }
+    HelpScreen { align: center middle; background: #00000099; }
     #help-box { width: 62; height: auto; max-height: 90%; padding: 1 2;
                 border: round $primary; background: $surface; }
     #help-title { text-style: bold; color: $primary; margin-bottom: 1; }
     .help-row { height: 1; }
-    .help-key { width: 14; color: $secondary; text-style: bold; }
+    .help-key { width: 16; color: $secondary; text-style: bold; }
     .help-desc { width: 1fr; }
     """
 
     def compose(self) -> ComposeResult:
         with Vertical(id="help-box"):
-            yield Static("TermVibe — key bindings", id="help-title")
+            yield Static(f"nocturne(1) v{__version__} — key bindings", id="help-title")
             for key, desc in HELP_ROWS:
                 with Horizontal(classes="help-row"):
                     yield Static(key, classes="help-key")
@@ -77,7 +88,7 @@ class HelpScreen(ModalScreen):
 class OpenScreen(ModalScreen):
     BINDINGS = [("escape", "close", "Cancel")]
     DEFAULT_CSS = """
-    OpenScreen { align: center middle; background: #00000088; }
+    OpenScreen { align: center middle; background: #00000099; }
     #open-box { width: 72; height: auto; padding: 1 2; border: round $secondary;
                 background: $surface; }
     #open-label { margin-bottom: 1; }
@@ -89,7 +100,8 @@ class OpenScreen(ModalScreen):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="open-box"):
-            yield Static("Folder (scanned recursively) or a single audio file:", id="open-label")
+            yield Static("target folder (scanned recursively) or a single audio file:",
+                         id="open-label")
             yield Input(placeholder="~/Music …", value=self._initial, id="open-input")
 
     def on_mount(self) -> None:
@@ -103,8 +115,8 @@ class OpenScreen(ModalScreen):
         self.dismiss(None)
 
 
-class TermVibeApp(App):
-    TITLE = "TermVibe"
+class NocturneApp(App):
+    TITLE = "NOCTURNE"
     SUB_TITLE = f"v{__version__}"
 
     CSS = """
@@ -154,6 +166,7 @@ class TermVibeApp(App):
         ("plus", "volume_up", "Vol+"),
         ("minus", "volume_down", "Vol−"),
         ("m", "toggle_mute", "Mute"),
+        ("v", "cycle_vis", "Visualizer"),
         ("s", "toggle_shuffle", "Shuffle"),
         ("r", "cycle_repeat", "Repeat"),
         ("t", "cycle_theme", "Theme"),
@@ -175,8 +188,10 @@ class TermVibeApp(App):
         repeat: str = "all",
         recursive: bool = True,
         visualizer: bool = True,
+        vis_mode: int = 0,
         silent: bool = False,
         volume: float = 0.85,
+        boot_sequence: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -187,13 +202,17 @@ class TermVibeApp(App):
             "repeat": repeat,
             "recursive": recursive,
             "visualizer": visualizer,
+            "vis_mode": int(vis_mode) % 3,
         }
+        self.boot_sequence = boot_sequence
         self.folder: Path | None = None
         self.tracks: list[metadata.Track] = []
         self.view: list[int] = []            # indices into tracks (post-filter)
         self.rows: list[ListItem] = []
         self.current: int = -1               # index into tracks
         self._painted_current: int = -2
+        self._status_msg: str = ""
+        self._blink_counter: int = 0
         self.filter_text = ""
         self.zen = False
         self._shuffle_order: list[int] = []
@@ -208,20 +227,23 @@ class TermVibeApp(App):
     def compose(self) -> ComposeResult:
         colors = self._colors()
         with Horizontal(id="topbar"):
-            yield Static(gradient_text("♪ TERMVIBE", colors["spectrum"][:2]), id="logo")
-            yield Static("· terminal music player", id="tagline")
+            yield Static(gradient_text(LOGO_TEXT, colors["spectrum"][:2]), id="logo")
+            yield Static("// offline audio intrusion unit — no packets leave this machine",
+                         id="tagline")
             yield Static("", id="topright")
         with Horizontal(id="now"):
             with Vertical(id="np-left"):
-                yield Static("nothing loaded — press o to open a folder", id="np-title")
+                yield Static("> no signal — press [o] to mount a target folder",
+                             id="np-title")
                 yield Static("", id="np-tech")
             yield Static("00:00 / 00:00", id="np-time")
-        yield SpectrumWidget(self.engine, self.theme, id="spectrum")
+        yield SpectrumWidget(self.engine, self.theme, mode=self.cfg["vis_mode"], id="spectrum")
         with Vertical(id="wavebox"):
             yield WaveBar(self.engine, self.theme, id="wavebar")
         yield ListView(id="playlist")
         with Horizontal(id="filterbar"):
-            yield Input(placeholder="filter by title / artist / filename … (esc to clear)", id="filter-input")
+            yield Input(placeholder="filter by title / artist / filename … (esc to clear)",
+                        id="filter-input")
         yield Static("", id="statusbar")
         yield Footer()
 
@@ -232,6 +254,10 @@ class TermVibeApp(App):
         self.set_interval(0.12, self._heartbeat)
         self.query_one("#wavebar", WaveBar).on_seek = self._seek_fraction
         self._refresh_topright()
+
+        # defer the intro until the main screen is fully up; skipped on tiny/degenerate PTYs
+        if self.boot_sequence:
+            self.call_after_refresh(self._push_boot)
 
         path = self.pending_start
         if not path:
@@ -248,23 +274,30 @@ class TermVibeApp(App):
             self.query_one("#spectrum").display = False
         if self.engine.silent:
             self.notify(
-                "No audio device found — running in silent mode (visuals only).",
-                title="Silent mode",
+                "No audio device found — ghost mode (visuals only).",
+                title="nocturne",
                 severity="warning",
                 timeout=10,
             )
 
     # --------------------------------------------------------------- splash
-    def _show_splash(self) -> None:
-        if self.query_one("#playlist", ListView).display:
-            self.query_one("#playlist", ListView).display = False
-            colors = self._colors()
-            art = Text(LOGO, style=f"bold {colors['spectrum'][1]}")
-            hint = Text(
-                "press  o  to open your music folder   ·   ?  for help",
-                style="italic",
+    def _push_boot(self) -> None:
+        if self.boot_sequence and self.size.width >= 60 and self.size.height >= 12:
+            self.push_screen(
+                BootScreen(ghost=self.engine.silent, device=self.engine.device_name or "")
             )
-            box = Vertical(Static(art), Static(hint, id="splash-hint"), id="splash-box")
+
+    def _show_splash(self) -> None:
+        lv = self.query_one("#playlist", ListView)
+        if lv.display:
+            lv.display = False
+            colors = self._colors()
+            art = Text(SKULL, style=f"bold {colors['spectrum'][2]}")
+            hello = Text("hello, friend.", style="italic")
+            hint = Text("press [o] to mount your music · [?] for the man page",
+                        style="dim")
+            box = Vertical(Static(art), Static(hello, id="splash-hello"),
+                           Static(hint, id="splash-hint"), id="splash-box")
             self.mount(Vertical(box, id="splash"), before="#playlist")
 
     def _hide_splash(self) -> None:
@@ -276,7 +309,7 @@ class TermVibeApp(App):
 
     # ---------------------------------------------------------------- theme
     def _refresh_topright(self) -> None:
-        out = "silent mode" if self.engine.silent else (self.engine.device_name or "audio output")
+        out = "ghost mode" if self.engine.silent else (self.engine.device_name or "audio output")
         if len(out) > 30:
             out = out[:29] + "…"
         self.query_one("#topright", Static).update(f"{self.theme} · {out}")
@@ -285,7 +318,7 @@ class TermVibeApp(App):
         self.theme = themes.next_theme(self.theme)
         colors = self._colors()
         self.query_one("#logo", Static).renderable = gradient_text(
-            "♪ TERMVIBE", colors["spectrum"][:2]
+            LOGO_TEXT, colors["spectrum"][:2]
         )
         self.query_one("#spectrum", SpectrumWidget).set_theme(self.theme)
         self.query_one("#wavebar", WaveBar).set_theme(self.theme)
@@ -293,15 +326,21 @@ class TermVibeApp(App):
         self._paint_current_row(force=True)
         self.notify(f"theme: {self.theme}", timeout=2)
 
+    def action_cycle_vis(self) -> None:
+        spectrum = self.query_one("#spectrum", SpectrumWidget)
+        mode = spectrum.cycle_mode()
+        self.cfg["vis_mode"] = mode
+        self.notify(f"visualizer: {themes.MODE_NAMES[mode]}", timeout=1)
+
     # --------------------------------------------------------------- opening
     def _open_path(self, raw: str) -> None:
         path = Path(str(raw)).expanduser()
         if not path.exists():
-            self.notify(f"Path not found: {path}", severity="error", title="Open")
+            self.notify(f"target not found: {path}", severity="error", title="open")
             return
         self.folder = path if path.is_dir() else path.parent
         self._hide_splash()
-        self._set_status(f"scanning {self.folder} …")
+        self._set_status(f"indexing {self._short_folder()} …")
         threading.Thread(
             target=self._scan_worker,
             args=(self.folder, self.cfg["recursive"]),
@@ -336,13 +375,14 @@ class TermVibeApp(App):
         self._painted_current = -2
         total = sum(t.duration for t in tracks)
         self._apply_filter()
-        status = f"{folder}  ·  {len(tracks)} tracks · {metadata.fmt_time(total)}"
-        self._set_status(status)
+        self._set_status(
+            f"{len(tracks)} files indexed · {metadata.fmt_time(total)} total"
+        )
         if tracks:
-            self.notify(f"Loaded {len(tracks)} tracks", title="Library", timeout=4)
+            self.notify(f"{len(tracks)} tracks indexed", title="nocturne", timeout=3)
             self._play_index(0)
         else:
-            self.notify("No playable audio files found there.", severity="warning", title="Library")
+            self.notify("no playable audio in target.", severity="warning", title="nocturne")
 
     # -------------------------------------------------------------- playlist
     def _make_row(self, ti: int) -> ListItem:
@@ -359,6 +399,14 @@ class TermVibeApp(App):
     @staticmethod
     def _short(s: str, n: int) -> str:
         return s if len(s) <= n else s[: n - 1] + "…"
+
+    def _short_folder(self) -> str:
+        if self.folder is None:
+            return "~"
+        try:
+            return "~/" + str(self.folder.expanduser().relative_to(Path.home()))
+        except ValueError:
+            return self.folder.name or str(self.folder)
 
     def _rebuild_playlist(self) -> None:
         lv = self.query_one("#playlist", ListView)
@@ -383,7 +431,8 @@ class TermVibeApp(App):
             if ti == cur:
                 playing = self.engine.playing
                 ind.update(IND_PLAY if playing else IND_PAUSE)
-                title.update(Text(self._short(self.tracks[ti].title, 80), style=f"bold {primary}"))
+                title.update(Text(self._short(self.tracks[ti].title, 80),
+                                  style=f"bold {primary}"))
             else:
                 ind.update(IND_IDLE)
                 title.update(Text(self._short(self.tracks[ti].title, 80)))
@@ -402,7 +451,7 @@ class TermVibeApp(App):
         self._hide_splash()
         self._load_gen += 1
         gen = self._load_gen
-        self._set_status(f"loading {self.tracks[ti].title} …")
+        self._set_status(f"decrypting {self.tracks[ti].path.name} …")
 
         def work() -> None:
             with self._load_lock:  # serialize engine access
@@ -421,12 +470,12 @@ class TermVibeApp(App):
         if gen != self._load_gen:
             return
         name = self.tracks[ti].path.name
-        self.notify(f"Skipped {name}: {err}", severity="error", title="Playback")
+        self.notify(f"skipped {name}: {err}", severity="error", title="playback")
         nxt = ti + 1
         if nxt < len(self.tracks):
             self._play_index(nxt)
         else:
-            self._set_status("nothing playable found")
+            self._set_status("nothing playable in target")
 
     def _load_ok(self, ti: int, info: dict, gen: int) -> None:
         if gen != self._load_gen:
@@ -437,15 +486,16 @@ class TermVibeApp(App):
         tech_bits = [t.subtitle, f"{info['format']}.{info['subtype']}",
                      f"{info['samplerate'] / 1000:g} kHz"]
         if t.tags.bitrate_kbps:
-            tech_bits.append(f"{t.tags.bitrate_kbps} kbps")
+            tech_bits.append(f"{t.tags.bitrate_kbps}kbps")
         if t.tags.year:
             tech_bits.append(t.tags.year)
         self.query_one("#np-title", Static).update(
-            Text(f"{IND_PLAY} {ti + 1}/{len(self.tracks)} · {t.title}", style="bold")
+            Text(f"> NOW PLAYING [{ti + 1}/{len(self.tracks)}] {t.title}", style="bold")
         )
         self.query_one("#np-tech", Static).update("  ·  ".join(tech_bits))
         self._paint_current_row(force=True)
         self._scroll_to_current()
+        self._set_status(f"injected {t.path.name} into /dev/audio")
         if self.cfg["shuffle"]:
             self._refresh_shuffle_order()
 
@@ -466,9 +516,10 @@ class TermVibeApp(App):
             return
         playing = self.engine.toggle()
         t = self.tracks[self.current]
+        label = "NOW PLAYING" if playing else "PAUSED"
         self.query_one("#np-title", Static).update(
-            Text(f"{IND_PLAY if playing else IND_PAUSE} {self.current + 1}/"
-                 f"{len(self.tracks)} · {t.title}", style="bold")
+            Text(f"> {label} [{self.current + 1}/{len(self.tracks)}] {t.title}",
+                 style="bold")
         )
         self._paint_current_row(force=True)
 
@@ -518,7 +569,7 @@ class TermVibeApp(App):
     def _auto_advance(self) -> None:
         idx = self._next_index(+1, auto=True)
         if idx is None:
-            self._set_status("end of playlist  ·  press n to restart")
+            self._set_status("transmission ended · press [n] to restart")
             return
         self._play_index(idx)
 
@@ -539,11 +590,11 @@ class TermVibeApp(App):
 
     def action_volume_up(self) -> None:
         v = self.engine.volume_up()
-        self.notify(f"volume {int(v * 100)}%", timeout=1)
+        self.notify(f"vol {int(v * 100)}%", timeout=1)
 
     def action_volume_down(self) -> None:
         v = self.engine.volume_down()
-        self.notify(f"volume {int(v * 100)}%", timeout=1)
+        self.notify(f"vol {int(v * 100)}%", timeout=1)
 
     def action_toggle_mute(self) -> None:
         self.notify("muted" if self.engine.toggle_mute() else "unmuted", timeout=1)
@@ -558,8 +609,7 @@ class TermVibeApp(App):
     def action_cycle_repeat(self) -> None:
         modes = ["off", "all", "one"]
         self.cfg["repeat"] = modes[(modes.index(self.cfg["repeat"]) + 1) % 3]
-        label = {"off": "repeat off", "all": "repeat all", "one": "repeat one"}[self.cfg["repeat"]]
-        self.notify(label, timeout=2)
+        self.notify(f"repeat: {self.cfg['repeat']}", timeout=2)
 
     def action_toggle_zen(self) -> None:
         self.zen = not self.zen
@@ -619,9 +669,9 @@ class TermVibeApp(App):
 
     def action_save_m3u(self) -> None:
         if not self.tracks:
-            self.notify("Nothing to save.", severity="warning", timeout=2)
+            self.notify("nothing to save.", severity="warning", timeout=2)
             return
-        target = (self.folder or Path.cwd()) / "termvibe_playlist.m3u"
+        target = (self.folder or Path.cwd()) / "nocturne_playlist.m3u"
         lines = ["#EXTM3U"]
         for t in self.tracks:
             artist = t.tags.artist or ""
@@ -629,26 +679,43 @@ class TermVibeApp(App):
             lines.append(str(t.path.resolve()))
         try:
             target.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            self.notify(f"saved {target.name}", title="M3U", timeout=3)
+            self.notify(f"saved {target.name}", title="m3u", timeout=3)
         except OSError as exc:
             self.notify(f"save failed: {exc}", severity="error", timeout=4)
 
     # ---------------------------------------------------------------- updates
-    def _set_status(self, left: str) -> None:
-        self.query_one("#statusbar", Static).update(self._status_text(left))
+    def _set_status(self, msg: str) -> None:
+        self._status_msg = msg
+        self._render_status()
 
-    def _status_text(self, left: str) -> Text:
-        modes = []
-        modes.append("shuffle" if self.cfg["shuffle"] else "sequential")
-        modes.append({"off": "repeat:off", "all": "repeat:all", "one": "repeat:one"}[self.cfg["repeat"]])
-        vol = "muted" if self.engine.muted else f"vol:{int(self.engine.volume * 100)}%"
-        modes.append(vol)
-        right = "  ·  ".join(modes)
+    def _render_status(self) -> None:
+        blink_on = (self._blink_counter % 8) < 5
+        cursor = "▊" if blink_on else " "
+        prompt = Text()
+        prompt.append(f"root@nocturne:{self._short_folder()}$ ",
+                      style=Style(color=self._colors()["theme"].primary, bold=True))
+        prompt.append(cursor, style=Style(color=self._colors()["theme"].primary))
+        if self._status_msg:
+            prompt.append(f" {self._status_msg}", style=Style(dim=True))
+        # right side: mode flags
+        modes: list[str] = []
+        modes.append("SHUF" if self.cfg["shuffle"] else "SEQ")
+        modes.append(f"RPT:{self.cfg['repeat'].upper()}")
+        modes.append("MUTE" if self.engine.muted else f"VOL:{int(self.engine.volume * 100)}")
+        if self.tracks:
+            modes.append(f"{len(self.view)}/{len(self.tracks)} FILES")
+        right = " ".join(f"[{m}]" for m in modes)
         width = max(20, self.size.width)
-        pad = max(1, width - len(left) - len(right) - 2)
-        return Text(left + " " * pad + right, style="")
+        pad = max(1, width - len(prompt.plain) - len(right) - 1)
+        prompt.append(" " * pad, style=Style(dim=True))
+        prompt.append(right, style=Style(dim=True, bold=True))
+        try:
+            self.query_one("#statusbar", Static).update(prompt)
+        except Exception:
+            pass
 
     def _heartbeat(self) -> None:
+        self._blink_counter += 1
         if self.engine.consume_ended():
             self._auto_advance()
         pos, dur = self.engine.position, self.engine.duration
@@ -657,8 +724,7 @@ class TermVibeApp(App):
                 f"{metadata.fmt_time(pos)} / {metadata.fmt_time(dur)}"
             )
             self.query_one("#wavebar", WaveBar).refresh()
-            tracks_bit = f"{len(self.view)}/{len(self.tracks)} tracks" if self.tracks else "no library"
-            self._set_status(tracks_bit)
+            self._render_status()
         except Exception:
             pass
 
@@ -674,6 +740,7 @@ class TermVibeApp(App):
                 "repeat": self.cfg["repeat"],
                 "recursive": self.cfg["recursive"],
                 "visualizer": self.cfg["visualizer"],
+                "vis_mode": self.cfg["vis_mode"],
             }
         )
         config.save_config(cfg)

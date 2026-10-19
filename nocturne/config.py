@@ -13,11 +13,12 @@ _DEFAULTS = {
     "version": CONFIG_VERSION,
     "last_folder": "",
     "volume": 0.85,
-    "theme": "synthwave",
+    "theme": "fsociety",
     "shuffle": False,
     "repeat": "all",        # off | all | one
     "recursive": True,
     "visualizer": True,
+    "vis_mode": 0,          # 0 spectrum | 1 matrix rain | 2 oscilloscope
 }
 
 
@@ -26,7 +27,7 @@ def config_dir() -> Path:
         base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
     else:
         base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-    return base / "termvibe"
+    return base / "nocturne"
 
 
 def config_path() -> Path:
@@ -44,6 +45,7 @@ def load_config() -> dict:
     except Exception:
         pass
     cfg["volume"] = min(1.0, max(0.0, float(cfg["volume"])))
+    cfg["vis_mode"] = int(cfg["vis_mode"]) % 3
     if cfg["repeat"] not in ("off", "all", "one"):
         cfg["repeat"] = "all"
     return cfg

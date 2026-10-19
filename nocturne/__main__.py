@@ -1,4 +1,4 @@
-"""Entry point: python -m termvibe [path]"""
+"""Entry point: python -m nocturne [path]"""
 
 from .cli import main
 

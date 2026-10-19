@@ -1,5 +1,5 @@
 """
-TermVibe — audio engine.
+Nocturne — audio engine.
 
 Streams decoded samples to the sound device through a callback and exposes
 real-time PCM taps for the spectrum visualizer.  When no audio device is
@@ -24,7 +24,7 @@ try:
     import soundfile as _sf
 except Exception as _e:  # pragma: no cover
     raise ImportError(
-        "TermVibe requires 'soundfile' (libsndfile). pip install soundfile"
+        "Nocturne requires 'soundfile' (libsndfile). pip install soundfile"
     ) from _e
 
 
@@ -205,7 +205,7 @@ class AudioEngine:
             return
         self._ticker_stop.clear()
         self._ticker = threading.Thread(
-            target=self._tick_loop, name="termvibe-silent", daemon=True
+            target=self._tick_loop, name="nocturne-silent", daemon=True
         )
         self._ticker.start()
 

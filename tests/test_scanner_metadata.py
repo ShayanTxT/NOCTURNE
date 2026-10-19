@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from termvibe.metadata import Tags, Track, fmt_time, read_tags
-from termvibe.scanner import natural_key, scan_folder
+from nocturne.metadata import Tags, Track, fmt_time, read_tags
+from nocturne.scanner import natural_key, scan_folder
 
 
 def _write(path: Path, seconds: float = 0.2, sr: int = 22050) -> None:

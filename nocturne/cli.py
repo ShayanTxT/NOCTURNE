@@ -1,4 +1,4 @@
-"""Command line interface for TermVibe."""
+"""Command line interface for Nocturne."""
 
 from __future__ import annotations
 
@@ -11,13 +11,13 @@ from . import __version__, themes
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="termvibe",
-        description="TermVibe — a stunning terminal music player. Give it a folder, it plays everything in it. 100%% offline.",
+        prog="nocturne",
+        description="Nocturne — a stunning terminal music player. Give it a folder, it plays everything in it. 100%% offline.",
         epilog="examples:\n"
-        "  termvibe ~/Music                play a folder (recursive)\n"
-        "  termvibe ~/Music --flat         don't scan subfolders\n"
-        "  termvibe song.flac              play a single file\n"
-        "  termvibe --theme matrix -s      matrix theme + shuffle\n",
+        "  nocturne ~/Music                play a folder (recursive)\n"
+        "  nocturne ~/Music --flat         don't scan subfolders\n"
+        "  nocturne song.flac              play a single file\n"
+        "  nocturne --theme matrix -s      matrix theme + shuffle\n",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p.add_argument("path", nargs="?", default=None,
@@ -29,10 +29,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="color theme (default: synthwave)")
     p.add_argument("--flat", action="store_true", help="don't scan subfolders")
     p.add_argument("--no-visualizer", action="store_true", help="hide the spectrum")
+    p.add_argument("--no-boot", action="store_true",
+                   help="skip the boot sequence intro")
     p.add_argument("--silent", action="store_true",
                    help="force silent mode (no audio output; useful for demos/CI)")
     p.add_argument("--list-themes", action="store_true", help="list available themes and exit")
-    p.add_argument("-V", "--version", action="version", version=f"TermVibe {__version__}")
+    p.add_argument("-V", "--version", action="version", version=f"Nocturne {__version__}")
     return p
 
 
@@ -59,9 +61,9 @@ def main(argv: list[str] | None = None) -> int:
                 args.path = str(candidate)
                 break
 
-    from .app import TermVibeApp
+    from .app import NocturneApp
 
-    app = TermVibeApp(
+    app = NocturneApp(
         start_path=args.path,
         theme=theme,
         shuffle=args.shuffle or bool(cfg["shuffle"]),
@@ -70,6 +72,8 @@ def main(argv: list[str] | None = None) -> int:
         visualizer=not args.no_visualizer,
         silent=args.silent,
         volume=volume,
+        boot_sequence=not args.no_boot,
+        vis_mode=cfg.get("vis_mode", 0),
     )
     app.run()
     return 0

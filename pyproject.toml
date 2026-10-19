@@ -3,14 +3,14 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "termvibe"
-version = "1.0.0"
-description = "A stunning terminal music player — live spectrum, waveform seek bar, themes. 100% offline."
+name = "nocturne"
+version = "2.0.0"
+description = "The hacker's terminal music player — Mr. Robot vibes, live spectrum & waveform seeking. 100% offline."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "TermVibe contributors" }]
-keywords = ["music", "player", "terminal", "tui", "audio", "mp3", "flac", "spectrum", "visualizer"]
+authors = [{ name = "Nocturne contributors" }]
+keywords = ["music", "player", "terminal", "tui", "audio", "flac", "spectrum", "visualizer", "hacker", "mr-robot"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
@@ -36,14 +36,14 @@ dependencies = [
 dev = ["pytest>=8"]
 
 [project.scripts]
-termvibe = "termvibe.cli:main"
+nocturne = "nocturne.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/YOUR_USERNAME/termvibe"
-Repository = "https://github.com/YOUR_USERNAME/termvibe"
+Homepage = "https://github.com/YOUR_USERNAME/nocturne"
+Repository = "https://github.com/YOUR_USERNAME/nocturne"
 
 [tool.setuptools.packages.find]
-include = ["termvibe*"]
+include = ["nocturne*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
